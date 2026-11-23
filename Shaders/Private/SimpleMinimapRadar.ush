@@ -1,0 +1,17 @@
+// SimpleMinimap radar background: filled disc with one ring just inside its edge.
+// M_SimpleMinimapRadar includes it as /Plugin/SimpleMinimap/Private/SimpleMinimapRadar.ush
+// UV is the widget's 0..1 UV; keep the widget square, otherwise the disc becomes an ellipse.
+#pragma once
+
+// rgb + opacity. RingRadius / RingWidth are fractions of the disc radius.
+float4 SimpleMinimapRadar(float2 UV, float3 FillColor, float3 RingColor, float RingRadius, float RingWidth)
+{
+	const float2 P = UV * 2.0 - 1.0;
+	const float R = length(P);
+	const float AA = max(fwidth(R), 1e-4);
+
+	const float Disc = saturate((1.0 - R) / AA + 0.5);
+	const float Ring = saturate((RingWidth * 0.5 - abs(R - RingRadius)) / AA + 0.5);
+
+	return float4(lerp(FillColor, RingColor, Ring), Disc);
+}

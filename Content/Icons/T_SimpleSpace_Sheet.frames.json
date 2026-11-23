@@ -1,0 +1,106 @@
+{
+ "texture": "/SimpleMinimap/Icons/T_SimpleSpace_Sheet",
+ "dest": "/SimpleMinimap/Icons/Sprites",
+ "prefix": "SPR_",
+ "note": "Subset of Content/MinimapSlate/Textures/Spritesheet/T_SimpleSpace_Sheet.frames.json (Kenney Simple Space, CC0).",
+ "frames": [
+  {
+   "name": "enemy_A",
+   "x": 0,
+   "y": 420,
+   "w": 48,
+   "h": 48
+  },
+  {
+   "name": "enemy_B",
+   "x": 100,
+   "y": 140,
+   "w": 48,
+   "h": 48
+  },
+  {
+   "name": "enemy_C",
+   "x": 0,
+   "y": 0,
+   "w": 64,
+   "h": 32
+  },
+  {
+   "name": "enemy_D",
+   "x": 100,
+   "y": 188,
+   "w": 48,
+   "h": 48
+  },
+  {
+   "name": "enemy_E",
+   "x": 100,
+   "y": 332,
+   "w": 48,
+   "h": 48
+  },
+  {
+   "name": "icon_exclamationLarge",
+   "x": 100,
+   "y": 284,
+   "w": 48,
+   "h": 48
+  },
+  {
+   "name": "icon_plusLarge",
+   "x": 104,
+   "y": 80,
+   "w": 48,
+   "h": 48
+  },
+  {
+   "name": "meteor_large",
+   "x": 144,
+   "y": 380,
+   "w": 48,
+   "h": 48
+  },
+  {
+   "name": "satellite_B",
+   "x": 0,
+   "y": 192,
+   "w": 52,
+   "h": 52
+  },
+  {
+   "name": "ship_E",
+   "x": 96,
+   "y": 436,
+   "w": 48,
+   "h": 48
+  },
+  {
+   "name": "ship_H",
+   "x": 56,
+   "y": 92,
+   "w": 48,
+   "h": 48
+  },
+  {
+   "name": "ship_L",
+   "x": 52,
+   "y": 244,
+   "w": 48,
+   "h": 48
+  },
+  {
+   "name": "star_medium",
+   "x": 52,
+   "y": 148,
+   "w": 48,
+   "h": 48
+  },
+  {
+   "name": "station_A",
+   "x": 48,
+   "y": 420,
+   "w": 48,
+   "h": 48
+  }
+ ]
+}

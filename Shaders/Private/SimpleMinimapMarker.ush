@@ -1,0 +1,110 @@
+// SimpleMinimap: markers drawn as ONE instanced Slate draw per atlas (SSimpleMinimapLayer + M_SimpleMinimapMarker).
+// Custom nodes include this file as /Plugin/SimpleMinimap/Private/SimpleMinimapMarker.ush
+//
+// What a UI material gets from SlateVertexShader.usf (all read in the VERTEX shader here):
+//   TexCoord0    quad corner, -0.5..0.5                   (per vertex)
+//   TexCoord1    radar centre, window pixels              (per vertex, same for all 4)
+//   TexCoord2/3  the instance float4 X, Y / Z, W          (per instance)
+//   TexCoord4.x  radar radius, window pixels              (per vertex)
+//
+// Instance layout. Every component is a whole number below 2^24, which a float holds exactly, so
+// the data survives any float path. It is decoded with float arithmetic in the vertex shader (fp32
+// on every platform) -- no bit casts, no uint maths. Must match SimpleMinimapPacking.h.
+//   X = PosX  * 4096 + PosY        12 + 12 bits, radar position, -1..1 mapped to 0..4095
+//   Y = Angle * 256  + ColorIndex  16 +  8 bits, angle 0..65535 = 0..360 deg clockwise; palette index
+//   Z = U     * 4096 + V           12 + 12 bits, sprite rect origin in atlas pixels
+//   W = Width * 4096 + Height      12 + 12 bits, sprite rect size in atlas pixels
+//
+// The pixel shader never sees the packed data. The vertex shader hands it plain values through
+// Customized UVs: UV5 = atlas UV, UV6 = position in radar units (circle mask), UV7.x = palette index.
+// Those are small numbers, so mobile half precision (MaterialFloat = half in the pixel shader) is enough.
+#pragma once
+
+// Split a whole number V < 2^24 into V / 4096 and V % 4096 (exact in fp32: division by a power of two).
+float2 SimpleMinimapSplit12(float V)
+{
+	const float Hi = floor(V * (1.0 / 4096.0));
+	return float2(Hi, V - Hi * 4096.0);
+}
+
+float2 SimpleMinimapSplit16_8(float V)
+{
+	const float Hi = floor(V * (1.0 / 256.0));
+	return float2(Hi, V - Hi * 256.0);
+}
+
+struct FSimpleMinimapMarker
+{
+	float2 Position;  // radar units, centre 0, edge 1, +Y down
+	float Angle;      // radians, clockwise on screen
+	float ColorIndex;
+	float4 RectPx;    // U, V, Width, Height in atlas pixels
+};
+
+FSimpleMinimapMarker SimpleMinimapUnpack(float4 Instance)
+{
+	FSimpleMinimapMarker M;
+	M.Position = SimpleMinimapSplit12(Instance.x) * (2.0 / 4095.0) - 1.0;
+	const float2 AngleColor = SimpleMinimapSplit16_8(Instance.y);
+	M.Angle = AngleColor.x * (6.28318530718 / 65536.0);
+	M.ColorIndex = AngleColor.y;
+	M.RectPx = float4(SimpleMinimapSplit12(Instance.z), SimpleMinimapSplit12(Instance.w));
+	return M;
+}
+
+// Corner offset in radar units: the quad keeps the sprite's aspect (longest side = IconSize), then rotates.
+float2 SimpleMinimapCornerOffset(float2 Corner, FSimpleMinimapMarker M, float IconSize)
+{
+	const float2 Px = max(M.RectPx.zw, 1.0);
+	const float2 Extent = IconSize * Px / max(Px.x, Px.y);
+	const float2 Local = Corner * Extent;
+	float S, C;
+	sincos(M.Angle, S, C);
+	return float2(Local.x * C - Local.y * S, Local.x * S + Local.y * C);
+}
+
+// --- Vertex shader outputs ---------------------------------------------------------------------
+
+// Screen Position pin (UI material WPO): absolute window position of this corner.
+float3 SimpleMinimapScreenPosition(float2 Corner, float2 RadarCenter, float RadarRadius, float4 Instance, float IconSize)
+{
+	const FSimpleMinimapMarker M = SimpleMinimapUnpack(Instance);
+	return float3(RadarCenter + (M.Position + SimpleMinimapCornerOffset(Corner, M, IconSize)) * RadarRadius, 0.0);
+}
+
+// Customized UV5: atlas UV of this corner.
+float2 SimpleMinimapAtlasUV(float2 Corner, float4 Instance, float2 AtlasSize)
+{
+	const FSimpleMinimapMarker M = SimpleMinimapUnpack(Instance);
+	return (M.RectPx.xy + (Corner + 0.5) * M.RectPx.zw) / max(AtlasSize, 1.0);
+}
+
+// Customized UV6: this corner in radar units, for the circle mask.
+float2 SimpleMinimapRadarPosition(float2 Corner, float4 Instance, float IconSize)
+{
+	const FSimpleMinimapMarker M = SimpleMinimapUnpack(Instance);
+	return M.Position + SimpleMinimapCornerOffset(Corner, M, IconSize);
+}
+
+// Customized UV7: x = palette index.
+float2 SimpleMinimapColorIndex(float4 Instance)
+{
+	return float2(SimpleMinimapUnpack(Instance).ColorIndex, 0.0);
+}
+
+// --- Pixel shader ------------------------------------------------------------------------------
+
+// rgb + opacity: atlas texel tinted by the palette, cut by the radar circle (antialiased).
+float4 SimpleMinimapMarkerColor(float2 AtlasUV, float2 RadarPosition, float ColorIndex,
+	Texture2D Atlas, SamplerState AtlasSampler,
+	float3 C0, float3 C1, float3 C2, float3 C3, float3 C4, float3 C5, float3 C6, float3 C7)
+{
+	const float3 Palette[8] = { C0, C1, C2, C3, C4, C5, C6, C7 };
+	const float3 Tint = Palette[(uint)round(ColorIndex) & 7u];
+
+	const float4 Texel = Texture2DSample(Atlas, AtlasSampler, AtlasUV);
+
+	const float R = length(RadarPosition);
+	const float Circle = saturate((1.0 - R) / max(fwidth(R), 1e-4) + 0.5);
+	return float4(Texel.rgb * Tint, Texel.a * Circle);
+}
